@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Enter a lot, its frontage and an NYC zoning district, and see the allowed 3D envelope with floors stacked up to the FAR.">
+<title>Lot Envelope Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<style>
+/* Layout: drafting-table split — a narrow spec sheet of inputs on the left, the 3D model and its takeoff numbers on the right. */
+:root {
+  --paper: #eef1ee;
+  --sheet: #f8faf8;
+  --ink: #1d272b;
+  --ink-2: #4c5a5f;
+  --rule: #cfd6d3;
+  --accent: #d9480f;      /* setback / limit lines */
+  --envelope: #2b7a9b;    /* allowed volume */
+  --mass: #c9c2b4;        /* base massing */
+  --mass-up: #a9b8bd;     /* above setback */
+  --ground: #dfe4e0;
+  --lot: #f4f6f3;
+  --yard: #b9d3a8;
+  --street: #9aa3a6;
+  --warn-bg: #fff1e6;
+  --warn-ink: #8a3a0a;
+  --ok: #2f7d4f;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12181b; --sheet: #182024; --ink: #e3e9e7; --ink-2: #9fb0b3; --rule: #2c383d;
+    --accent: #ff7a3d; --envelope: #5fb4d6; --mass: #8f887c; --mass-up: #6f8a93;
+    --ground: #1c2427; --lot: #253033; --yard: #3e5a35; --street: #3a4549;
+    --warn-bg: #3a2414; --warn-ink: #ffc49e; --ok: #6fcf97;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12181b; --sheet: #182024; --ink: #e3e9e7; --ink-2: #9fb0b3; --rule: #2c383d;
+  --accent: #ff7a3d; --envelope: #5fb4d6; --mass: #8f887c; --mass-up: #6f8a93;
+  --ground: #1c2427; --lot: #253033; --yard: #3e5a35; --street: #3a4549;
+  --warn-bg: #3a2414; --warn-ink: #ffc49e; --ok: #6fcf97;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 14px; line-height: 1.45;
+}
+.wrap {
+  max-width: 1440px; margin: 0 auto;
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 18px;
+}
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.sub { color: var(--ink-2); max-width: 70ch; margin: 2px 0 0; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.presets button, .btn {
+  font: 500 12px var(--font-mono); color: var(--ink); background: var(--sheet);
+  border: 1px solid var(--rule); border-radius: 4px; padding: 6px 10px; cursor: pointer;
+}
+.presets button:hover, .btn:hover { border-color: var(--ink-2); }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--envelope); outline-offset: 2px; }
+
+.main { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 880px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 16px; display: grid; gap: 16px; min-width: 0; }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; min-width: 0; }
+legend, .eyebrow {
+  font: 600 11px var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2);
+  padding: 0; margin-bottom: 8px;
+}
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+label { display: grid; gap: 4px; font-size: 12px; color: var(--ink-2); min-width: 0; }
+input, select {
+  font: 500 14px var(--font-mono); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 4px; padding: 6px 8px; width: 100%; min-width: 0;
+}
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg label { display: block; text-align: center; padding: 6px 4px; font: 500 12px var(--font-mono); color: var(--ink-2); cursor: pointer; background: var(--paper); }
+[hidden] { display: none !important; }
+.seg span { color: inherit; }
+.seg label:has(input:checked) { background: var(--ink); color: var(--paper); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--envelope); outline-offset: -2px; }
+.seg-wrap { display: grid; gap: 4px; font-size: 12px; color: var(--ink-2); }
+details summary { cursor: pointer; font: 600 11px var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+details[open] summary { margin-bottom: 10px; }
+.hint { font-size: 12px; color: var(--ink-2); margin: 0; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+
+.stage { display: grid; gap: 14px; min-width: 0; }
+.viewport { position: relative; height: min(64vh, 620px); min-height: 360px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.viewport canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.vp-tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+.legend { position: absolute; left: 10px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 12px; font: 500 11px var(--font-mono); color: var(--ink-2); background: color-mix(in srgb, var(--sheet) 85%, transparent); padding: 6px 8px; border-radius: 4px; max-width: calc(100% - 20px); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+@media (max-width: 720px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { background: var(--sheet); padding: 12px 14px; min-width: 0; }
+.stat .k { font: 600 11px var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.stat .v { font: 700 22px var(--font-display); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.stat .s { font: 400 12px var(--font-mono); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.bar { height: 4px; background: var(--rule); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.bar b { display: block; height: 100%; background: var(--ok); }
+.bar.short b { background: var(--accent); }
+
+.notes { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 880px) { .notes { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+.rules { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rules td { padding: 6px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.rules td:last-child { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 12px; }
+.rules tr:last-child td { border-bottom: 0; }
+.floors-wrap { max-height: 260px; overflow: auto; }
+.floors { width: 100%; border-collapse: collapse; font: 400 12px var(--font-mono); font-variant-numeric: tabular-nums; }
+.floors th { text-align: right; font: 600 11px var(--font-body); color: var(--ink-2); letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 6px; position: sticky; top: 0; background: var(--sheet); }
+.floors td { text-align: right; padding: 3px 6px; border-top: 1px solid var(--rule); }
+.floors th:first-child, .floors td:first-child { text-align: left; }
+.warn { background: var(--warn-bg); color: var(--warn-ink); border-radius: 4px; padding: 8px 10px; font-size: 13px; margin: 0 0 8px; }
+.fine { font-size: 12px; color: var(--ink-2); max-width: 90ch; margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Lot Envelope <span>Studio</span></h1>
+      <p class="sub">Enter a lot, its street frontage and district. The model applies the yard, setback and height rules, then stacks floors until the floor area ratio is used up or the envelope runs out.</p>
+    </div>
+    <div class="presets" aria-label="Sample lots">
+      <button type="button" data-preset="row">20×100 · R6B</button>
+      <button type="button" data-preset="mid">50×100 · R7A</button>
+      <button type="button" data-preset="corner">100×100 corner · R10</button>
+      <button type="button" data-preset="r8">75×100 · R8 height factor</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <form class="panel" id="form" autocomplete="off">
+      <fieldset>
+        <legend>Lot</legend>
+        <div class="row">
+          <label>Frontage (ft)<input id="W" type="number" min="10" max="1000" step="1" value="50"></label>
+          <label>Depth (ft)<input id="D" type="number" min="20" max="1000" step="1" value="100"></label>
+        </div>
+        <div class="seg-wrap">Lot type
+          <div class="seg" role="radiogroup">
+            <label><input type="radio" name="lotType" id="lt-int" value="interior" checked><span>Interior</span></label>
+            <label><input type="radio" name="lotType" id="lt-cor" value="corner"><span>Corner</span></label>
+          </div>
+        </div>
+        <div class="seg-wrap">Front street
+          <div class="seg" role="radiogroup">
+            <label><input type="radio" name="front" id="fs-w" value="wide" checked><span>Wide ≥75 ft</span></label>
+            <label><input type="radio" name="front" id="fs-n" value="narrow"><span>Narrow</span></label>
+          </div>
+        </div>
+        <div class="seg-wrap" id="sideWrap" hidden>Side street
+          <div class="seg" role="radiogroup">
+            <label><input type="radio" name="side" id="ss-w" value="wide"><span>Wide ≥75 ft</span></label>
+            <label><input type="radio" name="side" id="ss-n" value="narrow" checked><span>Narrow</span></label>
+          </div>
+        </div>
+      </fieldset>
+
+      <hr>
+
+      <fieldset>
+        <legend>Zoning</legend>
+        <div class="row">
+          <label>District
+            <select id="district">
+              <optgroup label="Contextual (Quality Housing)">
+                <option>R6B</option><option>R6A</option><option selected>R7A</option><option>R8B</option><option>R8A</option><option>R9A</option><option>R10A</option>
+              </optgroup>
+              <optgroup label="Height factor (sky exposure plane)">
+                <option>R6</option><option>R7-2</option><option>R8</option><option>R9</option><option>R10</option>
+              </optgroup>
+            </select>
+          </label>
+          <label>Floor area ratio<input id="far" type="number" min="0.1" max="20" step="0.01" value="4"></label>
+        </div>
+        <p class="hint" id="farHint">District default filled in. Change it to test a bonus, an inclusionary FAR, or a variance.</p>
+      </fieldset>
+
+      <details id="rulesBox" open>
+        <summary>Envelope rules (editable)</summary>
+        <fieldset>
+          <label>Envelope type
+            <select id="kind">
+              <option value="qh">Base height + setback + max height</option>
+              <option value="hf">Sky exposure plane</option>
+            </select>
+          </label>
+          <div class="row">
+            <label>Rear yard (ft)<input id="rear" type="number" min="0" max="200" step="1" value="30"></label>
+            <label>Max lot coverage (%)<input id="cov" type="number" min="10" max="100" step="1" value="65"></label>
+          </div>
+          <div id="qhFields" class="row" style="grid-template-columns: 1fr 1fr;">
+            <label>Min base height<input id="baseMin" type="number" min="0" step="1" value="40"></label>
+            <label>Max base height<input id="baseMax" type="number" min="10" step="1" value="75"></label>
+            <label>Max building height<input id="maxH" type="number" min="10" step="1" value="85"></label>
+            <span></span>
+            <label>Setback, wide street<input id="sbWide" type="number" min="0" step="1" value="10"></label>
+            <label>Setback, narrow street<input id="sbNarrow" type="number" min="0" step="1" value="15"></label>
+          </div>
+          <div id="hfFields" class="row" hidden>
+            <label>Plane starts at (ft)<input id="h0" type="number" min="10" step="1" value="60"></label>
+            <span></span>
+            <label>Initial setback, wide<input id="isWide" type="number" min="0" step="1" value="15"></label>
+            <label>Initial setback, narrow<input id="isNarrow" type="number" min="0" step="1" value="20"></label>
+            <label>Slope, wide (V:1)<input id="slWide" type="number" min="0.5" step="0.1" value="3.7"></label>
+            <label>Slope, narrow (V:1)<input id="slNarrow" type="number" min="0.5" step="0.1" value="2.7"></label>
+          </div>
+        </fieldset>
+      </details>
+
+      <hr>
+
+      <fieldset>
+        <legend>Floors</legend>
+        <div class="row">
+          <label>Ground floor (ft)<input id="gH" type="number" min="8" max="30" step="0.5" value="15"></label>
+          <label>Typical floor (ft)<input id="tH" type="number" min="8" max="20" step="0.5" value="10"></label>
+        </div>
+      </fieldset>
+    </form>
+
+    <section class="stage">
+      <div class="viewport" id="vp">
+        <div class="vp-tools"><button class="btn" type="button" id="fit">Fit view</button><button class="btn" type="button" id="toggleEnv">Hide envelope</button></div>
+        <div class="legend">
+          <span><i style="background:var(--mass)"></i>Base floors</span>
+          <span><i style="background:var(--mass-up)"></i>Above setback</span>
+          <span><i style="background:var(--envelope);opacity:.5"></i>Allowed envelope</span>
+          <span><i style="background:var(--yard)"></i>Rear yard</span>
+        </div>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="notes">
+        <div class="card">
+          <div class="eyebrow">Rules applied</div>
+          <div id="warnings"></div>
+          <table class="rules"><tbody id="rulesOut"></tbody></table>
+        </div>
+        <div class="card">
+          <div class="eyebrow">Floor schedule</div>
+          <div class="floors-wrap"><table class="floors"><thead><tr><th>Floor</th><th>Top (ft)</th><th>Plate (sf)</th><th>Cum. (sf)</th></tr></thead><tbody id="floorsOut"></tbody></table></div>
+        </div>
+      </div>
+
+      <p class="fine">Simplified model of NYC Zoning Resolution residential bulk rules. District values are approximate standard (non-bonus) figures, and many changed with the 2024 City of Yes amendments, so check each one against the current ZR text and ZoLa before relying on the output. Not modeled: open space ratio, towers, street wall location and recess rules, permitted obstructions, through lots, split lots, special districts, and the difference between gross and zoning floor area.</p>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- District table (approximate; every value is editable in the form) ----------
+  const QH = (far, baseMin, baseMax, maxH, cov) => ({ kind: "qh", far, baseMin, baseMax, maxH, cov, sbWide: 10, sbNarrow: 15, rear: 30 });
+  const HF = (far, h0, slWide) => ({ kind: "hf", far, h0, isWide: 15, isNarrow: 20, slWide, slNarrow: 2.7, cov: 100, rear: 30 });
+  const DISTRICTS = {
+    "R6B": QH(2.0, 30, 45, 55, 60),
+    "R6A": QH(3.0, 40, 65, 75, 65),
+    "R7A": QH(4.0, 40, 75, 85, 65),
+    "R8B": QH(4.0, 55, 65, 75, 70),
+    "R8A": QH(6.02, 60, 105, 125, 70),
+    "R9A": QH(7.52, 60, 105, 145, 70),
+    "R10A": QH(10.0, 125, 155, 215, 70),
+    "R6": HF(2.43, 60, 3.7),
+    "R7-2": HF(3.44, 60, 3.7),
+    "R8": HF(6.02, 60, 3.7),
+    "R9": HF(7.52, 85, 5.6),
+    "R10": HF(10.0, 85, 5.6),
+  };
+  const PRESETS = {
+    row: { W: 20, D: 100, lotType: "interior", front: "narrow", side: "narrow", district: "R6B" },
+    mid: { W: 50, D: 100, lotType: "interior", front: "wide", side: "narrow", district: "R7A" },
+    corner: { W: 100, D: 100, lotType: "corner", front: "wide", side: "narrow", district: "R10" },
+    r8: { W: 75, D: 100, lotType: "interior", front: "wide", side: "narrow", district: "R8" },
+  };
+  const MIN_PLATE_DIM = 10; // ft; a floor narrower than this is not counted as usable
+
+  const $ = (id) => document.getElementById(id);
+  const num = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : 0; };
+  const radio = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
+  const fmt = (n, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d });
+
+  function applyDistrict(name) {
+    const d = DISTRICTS[name];
+    $("far").value = d.far;
+    $("kind").value = d.kind;
+    $("rear").value = d.rear;
+    $("cov").value = d.cov;
+    if (d.kind === "qh") {
+      ["baseMin", "baseMax", "maxH", "sbWide", "sbNarrow"].forEach((k) => ($(k).value = d[k]));
+    } else {
+      ["h0", "isWide", "isNarrow", "slWide", "slNarrow"].forEach((k) => ($(k).value = d[k]));
+    }
+    syncKind();
+  }
+  function syncKind() {
+    const hf = $("kind").value === "hf";
+    $("qhFields").hidden = hf;
+    $("hfFields").hidden = !hf;
+  }
+
+  function readParams() {
+    return {
+      W: Math.max(1, num("W")), D: Math.max(1, num("D")),
+      corner: radio("lotType") === "corner",
+      front: radio("front"), side: radio("side"),
+      district: $("district").value,
+      far: Math.max(0, num("far")),
+      kind: $("kind").value,
+      rear: Math.max(0, num("rear")), cov: Math.min(100, Math.max(1, num("cov"))),
+      baseMin: num("baseMin"), baseMax: num("baseMax"), maxH: num("maxH"),
+      sbWide: num("sbWide"), sbNarrow: num("sbNarrow"),
+      h0: num("h0"), isWide: num("isWide"), isNarrow: num("isNarrow"),
+      slWide: Math.max(0.1, num("slWide")), slNarrow: Math.max(0.1, num("slNarrow")),
+      gH: Math.max(1, num("gH")), tH: Math.max(1, num("tH")),
+    };
+  }
+
+  // ---------- Envelope model ----------
+  // Lot coordinates: x along frontage (0..W), y depth from the front street line (0..D), z height.
+  // Corner lots have a second street along x = 0.
+  function makeModel(p) {
+    const lotArea = p.W * p.D;
+    const rear = p.corner ? 0 : p.rear;
+    const buildDepth = Math.max(0, Math.min(p.D - rear, (p.cov / 100) * p.D));
+
+    // Horizontal distance the building must stay back from a street line at height z.
+    function offset(z, cls) {
+      if (p.kind === "qh") {
+        if (z <= p.baseMax + 1e-9) return 0;
+        return cls === "wide" ? p.sbWide : p.sbNarrow;
+      }
+      if (z <= p.h0 + 1e-9) return 0;
+      const s0 = cls === "wide" ? p.isWide : p.isNarrow;
+      const slope = cls === "wide" ? p.slWide : p.slNarrow;
+      return Math.max(s0, (z - p.h0) / slope);
+    }
+    // Allowed rectangle at height z (null if the envelope has closed).
+    function rectAt(z, minDim = 0) {
+      if (p.kind === "qh" && z > p.maxH + 1e-9) return null;
+      const y0 = offset(z, p.front);
+      const x0 = p.corner ? offset(z, p.side) : 0;
+      const r = { x0, x1: p.W, y0, y1: buildDepth };
+      if (r.x1 - r.x0 <= minDim || r.y1 - r.y0 <= minDim) return null;
+      return r;
+    }
+    function stack(targetArea) {
+      const floors = [];
+      let z = 0, cum = 0, limitedBy = null;
+      for (let i = 0; i < 300; i++) {
+        if (cum >= targetArea - 1e-6) break;
+        const h = i === 0 ? p.gH : p.tH;
+        const r = rectAt(z + h, MIN_PLATE_DIM);
+        if (!r) { limitedBy = p.kind === "qh" && z + h > p.maxH ? "height" : "plane"; break; }
+        const w = r.x1 - r.x0, full = w * (r.y1 - r.y0);
+        let area = full, rr = r;
+        const remaining = targetArea - cum;
+        if (remaining < full) {
+          const d = remaining / w;           // partial top floor: trim from the rear
+          if (d < MIN_PLATE_DIM) break;      // too small to be a usable floor
+          area = remaining; rr = { ...r, y1: r.y0 + d };
+        }
+        floors.push({ n: i + 1, z0: z, z1: z + h, rect: rr, area, upper: r.y0 > 0 || r.x0 > 0, partial: area < full - 1e-6 });
+        cum += area; z += h;
+      }
+      return { floors, area: cum, height: z, limitedBy };
+    }
+    // Rings of the envelope for drawing: breakpoints get a ring just below and just above.
+    function rings() {
+      const zs = new Set([0]);
+      if (p.kind === "qh") { zs.add(p.baseMax); zs.add(p.maxH); }
+      else {
+        zs.add(p.h0);
+        [["wide", p.isWide, p.slWide], ["narrow", p.isNarrow, p.slNarrow]].forEach(([, s0, sl]) => zs.add(p.h0 + s0 * sl));
+      }
+      for (let z = 0; z <= 1500; z += 1) zs.add(z);
+      const list = [...zs].filter((z) => z >= 0).sort((a, b) => a - b);
+      const out = [];
+      const same = (a, b) => a && b && Math.abs(a.x0 - b.x0) < 1e-6 && Math.abs(a.y0 - b.y0) < 1e-6 && Math.abs(a.x1 - b.x1) < 1e-6 && Math.abs(a.y1 - b.y1) < 1e-6;
+      for (const z of list) {
+        const below = z === 0 ? rectAt(0) : rectAt(z - 1e-7);
+        const above = rectAt(z + 1e-7);
+        if (below) out.push({ z, r: below });
+        if (!above) break;
+        if (!same(below, above)) out.push({ z, r: above });
+      }
+      return out;
+    }
+    return { p, lotArea, rear, buildDepth, maxZFA: p.far * lotArea, rectAt, stack, rings };
+  }
+
+  // ---------- Three.js scene ----------
+  const vp = $("vp");
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  vp.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 1, 20000);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x667070, 0.75);
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  scene.add(hemi, sun, sun.target);
+  let content = new THREE.Group();
+  scene.add(content);
+  let envelopeGroup = null, showEnvelope = true, lastFitKey = "";
+
+  const css = () => getComputedStyle(document.documentElement);
+  const col = (name) => new THREE.Color(css().getPropertyValue(name).trim() || "#888");
+
+  // Lot (x, y, z) -> three (x, z, -y): the front street lies toward +Z.
+  const V = (x, y, z) => new THREE.Vector3(x, z, -y);
+
+  function disposeTree(obj) {
+    obj.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); }
+    });
+  }
+
+  function textSprite(text, color, worldH) {
+    const fontPx = 64;
+    const c = document.createElement("canvas");
+    const ctx = c.getContext("2d");
+    const font = `500 ${fontPx}px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.font = font;
+    const w = Math.ceil(ctx.measureText(text).width) + 24;
+    c.width = w; c.height = fontPx + 24;
+    ctx.font = font; ctx.fillStyle = color; ctx.textBaseline = "middle";
+    ctx.fillText(text, 12, c.height / 2);
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+    s.scale.set(worldH * (c.width / c.height), worldH, 1);
+    s.renderOrder = 10;
+    return s;
+  }
+
+  function flatRect(x0, y0, x1, y1, z, color, opts = {}) {
+    const g = new THREE.PlaneGeometry(x1 - x0, y1 - y0);
+    const m = new THREE.MeshStandardMaterial({ color, roughness: 1, metalness: 0, ...opts });
+    const mesh = new THREE.Mesh(g, m);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.copy(V((x0 + x1) / 2, (y0 + y1) / 2, z));
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  function loftMesh(rings, color, edgeColor) {
+    const pos = [];
+    const corners = (r, z) => [V(r.x0, r.y0, z), V(r.x1, r.y0, z), V(r.x1, r.y1, z), V(r.x0, r.y1, z)];
+    const tri = (a, b, c) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    const quad = (a, b, c, d) => { tri(a, b, c); tri(a, c, d); };
+    const pts = rings.map((g) => corners(g.r, g.z));
+    for (let i = 0; i < pts.length - 1; i++) {
+      for (let k = 0; k < 4; k++) quad(pts[i][k], pts[i][(k + 1) % 4], pts[i + 1][(k + 1) % 4], pts[i + 1][k]);
+    }
+    const top = pts[pts.length - 1];
+    quad(top[0], top[1], top[2], top[3]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    const grp = new THREE.Group();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }));
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 20), new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.85 }));
+    grp.add(mesh, edges);
+    return grp;
+  }
+
+  function buildScene(model, result) {
+    scene.remove(content); disposeTree(content);
+    content = new THREE.Group(); scene.add(content);
+    const { p } = model;
+    const ink = css().getPropertyValue("--ink-2").trim();
+    scene.background = col("--sheet");
+
+    const span = Math.max(p.W, p.D);
+    const pad = span * 0.9 + 60;
+    // ground
+    content.add(flatRect(-pad, -pad * 0.6, p.W + pad, p.D + pad, -0.05, col("--ground")));
+    // streets
+    const sw = (cls) => (cls === "wide" ? 80 : 60);
+    const fw = sw(p.front);
+    content.add(flatRect(-pad, -fw, p.W + pad, 0, 0.0, col("--street")));
+    const fl = textSprite(`${p.front.toUpperCase()} STREET`, ink, Math.max(5, span * 0.05));
+    fl.position.copy(V(p.W / 2, -fw / 2, 1)); content.add(fl);
+    if (p.corner) {
+      const ssw = sw(p.side);
+      content.add(flatRect(-ssw, -fw, 0, p.D + pad, 0.01, col("--street")));
+      const sl = textSprite(`${p.side.toUpperCase()} STREET`, ink, Math.max(5, span * 0.05));
+      sl.position.copy(V(-ssw / 2, p.D / 2, 1)); content.add(sl);
+    }
+    // lot + yard
+    content.add(flatRect(0, 0, p.W, p.D, 0.03, col("--lot")));
+    if (model.buildDepth < p.D) content.add(flatRect(0, model.buildDepth, p.W, p.D, 0.06, col("--yard")));
+    const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([V(0, 0, 0.1), V(p.W, 0, 0.1), V(p.W, p.D, 0.1), V(0, p.D, 0.1)]), new THREE.LineBasicMaterial({ color: col("--ink") }));
+    content.add(outline);
+    const dimW = textSprite(`${fmt(p.W)}′`, ink, Math.max(3.5, span * 0.035));
+    dimW.position.copy(V(p.W / 2, p.D + span * 0.06, 0.5)); content.add(dimW);
+    const dimD = textSprite(`${fmt(p.D)}′`, ink, Math.max(3.5, span * 0.035));
+    dimD.position.copy(V(p.W + span * 0.07, p.D / 2, 0.5)); content.add(dimD);
+
+    // envelope
+    const rings = model.rings();
+    envelopeGroup = rings.length > 1 ? loftMesh(rings, col("--envelope"), col("--envelope")) : new THREE.Group();
+    envelopeGroup.visible = showEnvelope;
+    content.add(envelopeGroup);
+
+    // setback line at base height / plane start
+    const breakZ = p.kind === "qh" ? p.baseMax : p.h0;
+    const rBase = model.rectAt(breakZ - 1e-7);
+    if (rBase) {
+      const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([V(rBase.x0, rBase.y0, breakZ), V(rBase.x1, rBase.y0, breakZ), V(rBase.x1, rBase.y1, breakZ), V(rBase.x0, rBase.y1, breakZ)]), new THREE.LineDashedMaterial({ color: col("--accent"), dashSize: 2, gapSize: 1.5 }));
+      line.computeLineDistances();
+      content.add(line);
+    }
+
+    // floors
+    const mBase = new THREE.MeshStandardMaterial({ color: col("--mass"), roughness: 0.85 });
+    const mUp = new THREE.MeshStandardMaterial({ color: col("--mass-up"), roughness: 0.85 });
+    const edgeMat = new THREE.LineBasicMaterial({ color: col("--ink"), transparent: true, opacity: 0.55 });
+    const gap = 0.35;
+    for (const f of result.floors) {
+      const r = f.rect, w = r.x1 - r.x0, d = r.y1 - r.y0, h = f.z1 - f.z0 - gap;
+      const g = new THREE.BoxGeometry(w, h, d);
+      const mesh = new THREE.Mesh(g, f.upper ? mUp : mBase);
+      mesh.position.copy(V(r.x0 + w / 2, r.y0 + d / 2, f.z0 + h / 2));
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), edgeMat);
+      e.position.copy(mesh.position);
+      content.add(mesh, e);
+    }
+    if (result.floors.length) {
+      const top = result.floors[result.floors.length - 1];
+      const lab = textSprite(`${fmt(result.height)} ft · ${result.floors.length} fl`, css().getPropertyValue("--ink").trim(), Math.max(4, span * 0.045));
+      lab.position.copy(V((top.rect.x0 + top.rect.x1) / 2, (top.rect.y0 + top.rect.y1) / 2, result.height + Math.max(6, span * 0.06)));
+      content.add(lab);
+    }
+
+    // sun + shadow camera sized to the scene
+    const H = Math.max(result.height, 40);
+    sun.position.set(p.W * 1.2 + H, H * 2.2 + 80, span * 1.1);
+    sun.target.position.set(p.W / 2, 0, -p.D / 2);
+    const sc = sun.shadow.camera, ext = span + H * 1.5;
+    sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.near = 1; sc.far = ext * 6;
+    sc.updateProjectionMatrix();
+
+    const fitKey = [p.W, p.D, p.corner].join("|");
+    if (fitKey !== lastFitKey) { fitView(model, result); lastFitKey = fitKey; }
+  }
+
+  let lastModel = null, lastResult = null;
+  function fitView(model, result) {
+    const { p } = model;
+    const H = Math.max(result.height, 30);
+    const center = new THREE.Vector3(p.W / 2, H * 0.4, -p.D / 2);
+    const radius = Math.sqrt(p.W * p.W + p.D * p.D + H * H) * 0.62;
+    const dist = radius / Math.sin((camera.fov * Math.PI) / 360) * 1.3;
+    const dir = new THREE.Vector3(p.corner ? -0.75 : 0.85, 0.62, 1).normalize();
+    camera.position.copy(center).addScaledVector(dir, dist);
+    controls.target.copy(center);
+    controls.update();
+  }
+
+  // ---------- Output ----------
+  function render() {
+    const p = readParams();
+    const model = makeModel(p);
+    const result = model.stack(model.maxZFA);
+    const capacity = model.stack(Infinity);
+    lastModel = model; lastResult = result;
+    buildScene(model, result);
+
+    const used = model.maxZFA > 0 ? result.area / model.maxZFA : 0;
+    const short = used < 0.995;
+    const capFAR = capacity.area / model.lotArea;
+    $("stats").innerHTML = `
+      <div class="stat"><div class="k">Max floor area</div><div class="v">${fmt(model.maxZFA)} sf</div><div class="s">FAR ${fmt(p.far, 2)} × ${fmt(model.lotArea)} sf lot</div></div>
+      <div class="stat"><div class="k">Modeled floor area</div><div class="v">${fmt(result.area)} sf</div><div class="s">${fmt(used * 100, 1)}% of allowed</div><div class="bar ${short ? "short" : ""}"><b style="width:${Math.min(100, used * 100)}%"></b></div></div>
+      <div class="stat"><div class="k">Height</div><div class="v">${fmt(result.height)} ft</div><div class="s">${result.floors.length} floors</div></div>
+      <div class="stat"><div class="k">Envelope capacity</div><div class="v">${fmt(capacity.area)} sf</div><div class="s">≈ FAR ${fmt(capFAR, 2)} if filled</div></div>`;
+
+    const rows = [];
+    rows.push(["Lot area", `${fmt(model.lotArea)} sf`]);
+    rows.push([p.corner ? "Rear yard (not required on a corner lot)" : "Rear yard", `${fmt(model.rear)} ft`]);
+    rows.push(["Buildable depth (rear yard and lot coverage)", `${fmt(model.buildDepth, 1)} ft`]);
+    rows.push(["Ground footprint", `${fmt(p.W * model.buildDepth)} sf · ${fmt((model.buildDepth / p.D) * 100, 0)}%`]);
+    if (p.kind === "qh") {
+      rows.push(["Street wall base height", `${fmt(p.baseMin)}–${fmt(p.baseMax)} ft`]);
+      rows.push([`Setback above base, front (${p.front} street)`, `${fmt(p.front === "wide" ? p.sbWide : p.sbNarrow)} ft`]);
+      if (p.corner) rows.push([`Setback above base, side (${p.side} street)`, `${fmt(p.side === "wide" ? p.sbWide : p.sbNarrow)} ft`]);
+      rows.push(["Maximum building height", `${fmt(p.maxH)} ft`]);
+    } else {
+      const s = (cls) => `${fmt(cls === "wide" ? p.isWide : p.isNarrow)} ft, then ${fmt(cls === "wide" ? p.slWide : p.slNarrow, 1)}:1`;
+      rows.push(["Sky exposure plane starts at", `${fmt(p.h0)} ft`]);
+      rows.push([`Front (${p.front} street) setback`, s(p.front)]);
+      if (p.corner) rows.push([`Side (${p.side} street) setback`, s(p.side)]);
+      rows.push(["Maximum building height", "none (plane governs)"]);
+    }
+    $("rulesOut").innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("");
+
+    const warns = [];
+    if (model.buildDepth < MIN_PLATE_DIM) warns.push("The rear yard and lot coverage leave less than 10 ft of buildable depth, so nothing can be placed.");
+    else if (short) {
+      const why = result.limitedBy === "height" ? `the ${fmt(p.maxH)} ft height limit` : result.limitedBy === "plane" ? "the sky exposure plane" : "the minimum usable floor size";
+      warns.push(`The envelope runs out before the FAR does: ${fmt(result.area)} of ${fmt(model.maxZFA)} sf fits under ${why}. Lower floor heights, or a deeper or wider lot, would recover more.`);
+    }
+    if (p.kind === "qh" && result.floors.length && result.height < p.baseMin) warns.push(`This massing tops out at ${fmt(result.height)} ft, below the ${fmt(p.baseMin)} ft minimum base height. A real building would need a taller, shallower street wall.`);
+    $("warnings").innerHTML = warns.map((w) => `<p class="warn">${w}</p>`).join("");
+
+    let cum = 0;
+    $("floorsOut").innerHTML = result.floors.map((f) => { cum += f.area; return `<tr><td>${f.n}${f.upper ? " · set back" : ""}${f.partial ? " · partial" : ""}</td><td>${fmt(f.z1, 1)}</td><td>${fmt(f.area)}</td><td>${fmt(cum)}</td></tr>`; }).reverse().join("") || `<tr><td colspan="4">No floors fit.</td></tr>`;
+  }
+
+  // ---------- Wiring ----------
+  function setPreset(key) {
+    const pr = PRESETS[key];
+    $("W").value = pr.W; $("D").value = pr.D;
+    document.querySelector(`input[name="lotType"][value="${pr.lotType}"]`).checked = true;
+    document.querySelector(`input[name="front"][value="${pr.front}"]`).checked = true;
+    document.querySelector(`input[name="side"][value="${pr.side}"]`).checked = true;
+    $("district").value = pr.district;
+    applyDistrict(pr.district);
+    $("sideWrap").hidden = pr.lotType !== "corner";
+    lastFitKey = "";
+    render();
+  }
+  document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => setPreset(b.dataset.preset)));
+  $("district").addEventListener("change", (e) => { applyDistrict(e.target.value); render(); });
+  $("kind").addEventListener("change", () => { syncKind(); render(); });
+  $("form").addEventListener("input", (e) => {
+    if (e.target.id === "district" || e.target.id === "kind") return;
+    $("sideWrap").hidden = radio("lotType") !== "corner";
+    render();
+  });
+  $("form").addEventListener("submit", (e) => e.preventDefault());
+  $("fit").addEventListener("click", () => lastModel && fitView(lastModel, lastResult));
+  $("toggleEnv").addEventListener("click", (e) => {
+    showEnvelope = !showEnvelope;
+    if (envelopeGroup) envelopeGroup.visible = showEnvelope;
+    e.target.textContent = showEnvelope ? "Hide envelope" : "Show envelope";
+  });
+
+  function resize() {
+    const w = vp.clientWidth, h = vp.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(vp);
+  // Re-color the scene when the viewer's theme changes.
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render); } catch (_) {}
+  new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  (function loop() {
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  })();
+
+  applyDistrict($("district").value);
+  resize();
+  render();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+})();
+</script>
+
+</body>
+</html>
